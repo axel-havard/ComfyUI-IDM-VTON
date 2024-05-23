@@ -60,7 +60,8 @@ class IDM_VTON_low_VRAM:
         scheduler = DDPMScheduler.from_pretrained(scheduler_path)
         scheduler.set_timesteps(num_inference_steps)
         timesteps = scheduler.timesteps
-
+        add_text_embeds = None
+        add_time_ids = None
         latents = noise_latent
         added_cond_kwargs = {"text_embeds": add_text_embeds, "time_ids": add_time_ids}
         added_cond_kwargs["image_embeds"] = tryon_net.encoder_hid_proj(garment_image_clip_embedding)
