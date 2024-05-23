@@ -111,3 +111,51 @@ class PipelineLoader:
         pipe.weight_dtype = weight_dtype
         
         return (pipe, )
+    
+class TryOnNet_IDM:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "ckpt_path": ("STRING", {"default": "models/idm_vton/unet"}),
+                "weight_dtype": (("float32", "float16", "bfloat16"), ),
+            }
+        }
+
+    CATEGORY = "ComfyUI-IDM-VTON"
+    INPUT_NODE = True
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "load_tryonnet_idm"
+
+    def load_tryonnet_idm(self, ckpt_path, weight_dtype):
+
+        unet = UNet2DConditionModel.from_pretrained(
+            ckpt_path,
+            torch_dtype=weight_dtype
+        )
+
+        return unet
+
+class GarmentNet_IDM:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "ckpt_path": ("STRING", {"default": "models/unet_encoder"}),
+                "weight_dtype": (("float32", "float16", "bfloat16"), ),
+            }
+        }
+
+    CATEGORY = "ComfyUI-IDM-VTON"
+    INPUT_NODE = True
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "load_garmentnet_idm"
+
+    def load_garmentnet_idm(self, ckpt_path, weight_dtype):
+
+        unet_encoder = UNet2DConditionModel_ref.from_pretrained(
+            ckpt_path,
+            torch_dtype=weight_dtype
+        )
+
+        return unet_encoder
