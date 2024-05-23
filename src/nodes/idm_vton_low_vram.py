@@ -95,7 +95,11 @@ class IDM_VTON_low_VRAM:
         added_cond_kwargs["image_embeds"] = tryon_net.encoder_hid_proj(garment_image_clip_embedding)
 
         latents = noise_latent
-        
+
+        mask_image_latent = torch.cat([mask_image_latent]*2, dim=0)
+        masked_image_latent = torch.cat([masked_image_latent]*2, dim=0)
+        densepose_latent = torch.cat([densepose_latent]*2, dim=0)
+
         if mask_image_latent.shape[1]>1:
             mask_image_latent = mask_image_latent[:,0:1,:,:]
 
