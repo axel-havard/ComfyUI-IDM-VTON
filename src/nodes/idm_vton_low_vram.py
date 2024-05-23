@@ -72,7 +72,7 @@ class IDM_VTON_low_VRAM:
             }
         }
     
-    RETURN_TYPES = ("LATENT")
+    RETURN_TYPES = ("LATENT",)
     FUNCTION = "make_inference"
     CATEGORY = "ComfyUI-IDM-VTON"
 

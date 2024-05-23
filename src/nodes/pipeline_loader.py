@@ -134,7 +134,7 @@ class TryOnNet_IDM:
             torch_dtype=weight_dtype
         )
 
-        return unet
+        return (unet,)
 
 class GarmentNet_IDM:
     @classmethod
@@ -158,4 +158,4 @@ class GarmentNet_IDM:
             torch_dtype=weight_dtype
         )
 
-        return unet_encoder
+        return (unet_encoder,)
