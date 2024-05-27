@@ -47,37 +47,37 @@ class PipelineLoader:
             ckpt_path,
             subfolder="vae",
             torch_dtype=weight_dtype
-        ).requires_grad_(False).eval().to(DEVICE)
+        ).requires_grad_(False).eval()
         
         unet = UNet2DConditionModel.from_pretrained(
             ckpt_path,
             subfolder="unet",
             torch_dtype=weight_dtype
-        ).requires_grad_(False).eval().to(DEVICE)
+        ).requires_grad_(False).eval()
         
         image_encoder = CLIPVisionModelWithProjection.from_pretrained(
             ckpt_path,
             subfolder="image_encoder",
             torch_dtype=weight_dtype
-        ).requires_grad_(False).eval().to(DEVICE)
+        ).requires_grad_(False).eval()
         
         unet_encoder = UNet2DConditionModel_ref.from_pretrained(
             ckpt_path,
             subfolder="unet_encoder",
             torch_dtype=weight_dtype
-        ).requires_grad_(False).eval().to(DEVICE)
+        ).requires_grad_(False).eval()
         
         text_encoder_one = CLIPTextModel.from_pretrained(
             ckpt_path,
             subfolder="text_encoder",
             torch_dtype=weight_dtype
-        ).requires_grad_(False).eval().to(DEVICE)
+        ).requires_grad_(False).eval()
         
         text_encoder_two = CLIPTextModelWithProjection.from_pretrained(
             ckpt_path,
             subfolder="text_encoder_2",
             torch_dtype=weight_dtype
-        ).requires_grad_(False).eval().to(DEVICE)
+        ).requires_grad_(False).eval()
         
         tokenizer_one = AutoTokenizer.from_pretrained(
             ckpt_path,

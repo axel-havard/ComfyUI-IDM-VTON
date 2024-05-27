@@ -1529,7 +1529,8 @@ class StableDiffusionXLInpaintPipeline(
         text_encoder_lora_scale = (
             self.cross_attention_kwargs.get("scale", None) if self.cross_attention_kwargs is not None else None
         )
-
+        self.text_encoder.to(device)
+        self.text_encoder_2.to(device)
         (
             prompt_embeds,
             negative_prompt_embeds,
@@ -1550,7 +1551,8 @@ class StableDiffusionXLInpaintPipeline(
             lora_scale=text_encoder_lora_scale,
             clip_skip=self.clip_skip,
         )
-
+        self.text_encoder.to("cpu")
+        self.text_encoder_2.to("cpu")
         # 4. set timesteps
         def denoising_value_valid(dnv):
             return isinstance(self.denoising_end, float) and 0 < dnv < 1
@@ -1602,6 +1604,8 @@ class StableDiffusionXLInpaintPipeline(
         num_channels_latents = self.vae.config.latent_channels
         num_channels_unet = self.unet.config.in_channels
         return_image_latents = num_channels_unet == 4
+
+        self.vae.to(device)
 
         add_noise = True if self.denoising_start is None else False
         latents_outputs = self.prepare_latents(
@@ -1669,7 +1673,9 @@ class StableDiffusionXLInpaintPipeline(
         #     )
         # 8.1 Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-
+        
+        self.vae.to("cpu")
+        
         # 9. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         height, width = latents.shape[-2:]
         height = height * self.vae_scale_factor
@@ -1715,14 +1721,16 @@ class StableDiffusionXLInpaintPipeline(
         add_time_ids = add_time_ids.to(device)
 
         if ip_adapter_image is not None:
+            self.image_encoder.to(device)
             image_embeds = self.prepare_ip_adapter_image_embeds(
                 ip_adapter_image, device, batch_size * num_images_per_prompt
             )
-
+            self.image_encoder.to("cpu")
             #project outside for loop
+            self.unet.to(device)
             image_embeds = self.unet.encoder_hid_proj(image_embeds).to(prompt_embeds.dtype)
 
-
+        self.unet_encoder.to(device)
         # 11. Denoising loop
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
 
@@ -1861,8 +1869,11 @@ class StableDiffusionXLInpaintPipeline(
 
                 if XLA_AVAILABLE:
                     xm.mark_step()
-
+        self.unet.to("cpu")
+        self.unet_encoder.to("cpu")
+        
         if not output_type == "latent":
+            self.vae.to(device)
             # make sure the VAE is in float32 mode, as it overflows in float16
             needs_upcasting = self.vae.dtype == torch.float16 and self.vae.config.force_upcast
 
@@ -1877,6 +1888,7 @@ class StableDiffusionXLInpaintPipeline(
                 self.vae.to(dtype=torch.float16)
         # else:
         #     return StableDiffusionXLPipelineOutput(images=latents)
+            self.vae.to("cpur")
 
 
         image = self.image_processor.postprocess(image, output_type=output_type)
