@@ -114,6 +114,7 @@ class IDM_VTON:
                         width=width,
                         ip_adapter_image=garment_img,
                         guidance_scale=guidance_scale,
+                        device=DEVICE
                     )[0]
                     
                     images = [transforms.ToTensor()(image) for image in images]

@@ -1294,6 +1294,7 @@ class StableDiffusionXLInpaintPipeline(
         pooled_prompt_embeds_c=None,
         callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
         callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        device:str="cuda",
         **kwargs,
     ):
         r"""
@@ -1522,8 +1523,6 @@ class StableDiffusionXLInpaintPipeline(
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
-
-        device = self._execution_device
 
         # 3. Encode input prompt
         text_encoder_lora_scale = (

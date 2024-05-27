@@ -107,7 +107,6 @@ class PipelineLoader:
             torch_dtype=weight_dtype,
         )
         pipe.unet_encoder = unet_encoder
-        pipe = pipe.to(DEVICE)
         pipe.weight_dtype = weight_dtype
         
         return (pipe, )
