@@ -7,6 +7,7 @@ from torchvision import transforms
 from comfy.model_management import get_torch_device
 from diffusers import DDPMScheduler
 import os
+from tqdm import tqdm
 DEVICE = get_torch_device()
 MAX_RESOLUTION = 16384
 
@@ -41,13 +42,22 @@ def prepare_pool_embeds(
     return pool_embeddings
 
 def sdxl_get_add_time_ids(
-    batch_size,original_size, crops_coords_top_left, target_size, dtype
+    batch_size,original_size, crops_coords_top_left, target_size, dtype,device
 ):
     add_time_ids = list(original_size + crops_coords_top_left + target_size)
     add_time_ids = torch.tensor([add_time_ids], dtype=dtype)
     add_time_ids = torch.cat([add_time_ids]*batch_size,dim=0)
-    return add_time_ids
+    return add_time_ids.to(device)
 
+def progress_bar(iterable=None, total=None):
+        
+        if iterable is not None:
+            return tqdm(iterable)
+        elif total is not None:
+            return tqdm(total=total)
+        else:
+            raise ValueError("Either `total` or `iterable` has to be defined.")
+        
 class IDM_VTON_low_VRAM:
     @classmethod
     def INPUT_TYPES(s):
@@ -60,14 +70,13 @@ class IDM_VTON_low_VRAM:
                 "mask_image_latent": ("LATENT",),
                 "masked_image_latent": ("LATENT",),
                 "garment_image_latent": ("LATENT",),
-                "garment_image_clip_embedding": ("LATENT",),
+                "garment_image_clip_embedding": ("CLIP_VISION_OUTPUT",),
                 "positive": ("CONDITIONING", ),
                 "negative": ("CONDITIONING", ),
                 "garment_positive": ("CONDITIONING", ),
                 "garment_negative": ("CONDITIONING", ),
                 "num_inference_steps": ("INT", {"default": 30}),
                 "guidance_scale": ("FLOAT", {"default": 2.0}),
-                "strength": ("FLOAT", {"default": 1.0}),
                 "seed": ("INT", {"default": 42, "min": 0, "max": 0xffffffffffffffff}),
             }
         }
@@ -77,6 +86,15 @@ class IDM_VTON_low_VRAM:
     CATEGORY = "ComfyUI-IDM-VTON"
 
     def make_inference(self, tryon_net, garment_net,noise_latent,densepose_latent,mask_image_latent,masked_image_latent,garment_image_latent,garment_image_clip_embedding,positive,negative,garment_positive,garment_negative,num_inference_steps, guidance_scale, seed):
+        tryon_net.to(DEVICE)
+        garment_net.to(DEVICE)
+        device = tryon_net.device
+        dtype = tryon_net.dtype
+        noise_latent = noise_latent['samples'].to(DEVICE,dtype=dtype)
+        densepose_latent = densepose_latent['samples'].to(DEVICE,dtype=dtype)
+        mask_image_latent = mask_image_latent['samples'].to(DEVICE,dtype=dtype)
+        masked_image_latent = masked_image_latent['samples'].to(DEVICE,dtype=dtype)
+        garment_image_latent = garment_image_latent['samples'].to(DEVICE,dtype=dtype)
         
         current_dir = os.path.dirname(__file__)
         # Construct the path to the scheduler relative to the current file
@@ -84,16 +102,24 @@ class IDM_VTON_low_VRAM:
         scheduler = DDPMScheduler.from_pretrained(scheduler_path)
         scheduler.set_timesteps(num_inference_steps)
         timesteps = scheduler.timesteps
-        add_text_embeds = prepare_pool_embeds(positive,negative)
+        add_text_embeds = prepare_pool_embeds(positive,negative).to(DEVICE,dtype=dtype)
         height = noise_latent.shape[2] * 8 
         width = noise_latent.shape[3] * 8
         original_size=target_size=(height,width)
         crops_coords_top_left=(0,0)
-        add_time_ids = sdxl_get_add_time_ids(noise_latent.shape[0]*2,tryon_net,original_size, crops_coords_top_left,target_size,dtype=noise_latent.dtype)
+        add_time_ids = sdxl_get_add_time_ids(
+            batch_size = noise_latent.shape[0]*2,
+            original_size = original_size, 
+            crops_coords_top_left = crops_coords_top_left,
+            target_size=target_size,
+            dtype=dtype,
+            device=DEVICE)
         
         added_cond_kwargs = {"text_embeds": add_text_embeds, "time_ids": add_time_ids}
-        added_cond_kwargs["image_embeds"] = tryon_net.encoder_hid_proj(garment_image_clip_embedding)
-
+        image_embeds = tryon_net.encoder_hid_proj(garment_image_clip_embedding["penultimate_hidden_states"].to(DEVICE,dtype=dtype))
+        neg_image_embeds = tryon_net.encoder_hid_proj(torch.zeros_like(garment_image_clip_embedding["penultimate_hidden_states"].to(DEVICE,dtype=dtype)))
+        added_cond_kwargs["image_embeds"] = torch.cat([neg_image_embeds,image_embeds],dim=0)
+        print(f"image embeds :{added_cond_kwargs['image_embeds']}, shape {added_cond_kwargs['image_embeds'].shape}")
         latents = noise_latent
 
         mask_image_latent = torch.cat([mask_image_latent]*2, dim=0)
@@ -103,13 +129,12 @@ class IDM_VTON_low_VRAM:
         if mask_image_latent.shape[1]>1:
             mask_image_latent = mask_image_latent[:,0:1,:,:]
 
-        text_embeds_cloth = prepare_text_embeddings(garment_positive,garment_negative)
-        prompt_embeds = prepare_text_embeddings(positive,negative)
-        with self.progress_bar(total=num_inference_steps) as progress_bar:
+        text_embeds_cloth = prepare_text_embeddings(garment_positive).to(DEVICE,dtype=dtype)
+        prompt_embeds = prepare_text_embeddings(positive,negative).to(DEVICE,dtype=dtype)
+        with progress_bar(total=num_inference_steps) as pb:
             for i, t in enumerate(timesteps):
-                if self.interrupt:
-                    continue
-                latent_model_input = torch.cat([latents] * 2) if self.do_classifier_free_guidance else latents
+
+                latent_model_input = torch.cat([latents] * 2) 
 
                 latent_model_input = scheduler.scale_model_input(latent_model_input, t)
 
@@ -138,5 +163,9 @@ class IDM_VTON_low_VRAM:
 
                 latents = scheduler.step(noise_pred, t, latents, return_dict=False)[0]
 
-        return (latents,)
+                pb.update()
+
+        tryon_net.to("cpu")
+        garment_net.to("cpu")
+        return ({"samples":latents},)
 

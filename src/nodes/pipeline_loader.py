@@ -128,7 +128,13 @@ class TryOnNet_IDM:
     FUNCTION = "load_tryonnet_idm"
 
     def load_tryonnet_idm(self, ckpt_path, weight_dtype):
-
+        if weight_dtype == "float32":
+            weight_dtype = torch.float32
+        elif weight_dtype == "float16":
+            weight_dtype = torch.float16
+        elif weight_dtype == "bfloat16":
+            weight_dtype = torch.bfloat16
+        
         unet = UNet2DConditionModel.from_pretrained(
             ckpt_path,
             torch_dtype=weight_dtype
@@ -152,10 +158,17 @@ class GarmentNet_IDM:
     FUNCTION = "load_garmentnet_idm"
 
     def load_garmentnet_idm(self, ckpt_path, weight_dtype):
-
+        if weight_dtype == "float32":
+            weight_dtype = torch.float32
+        elif weight_dtype == "float16":
+            weight_dtype = torch.float16
+        elif weight_dtype == "bfloat16":
+            weight_dtype = torch.bfloat16
+        
         unet_encoder = UNet2DConditionModel_ref.from_pretrained(
             ckpt_path,
-            torch_dtype=weight_dtype
+            torch_dtype=weight_dtype,
+            use_safetensors=True
         )
 
         return (unet_encoder,)
